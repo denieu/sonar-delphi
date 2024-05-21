@@ -18,6 +18,9 @@
  */
 package au.com.integradev.delphi.checks;
 
+import au.com.integradev.delphi.utils.NameConventionUtils;
+import com.google.common.base.Splitter;
+import java.util.List;
 import org.sonar.check.Rule;
 import org.sonar.plugins.communitydelphi.api.ast.PointerTypeNode;
 import org.sonar.plugins.communitydelphi.api.ast.TypeDeclarationNode;
@@ -31,6 +34,15 @@ import org.sonarsource.analyzer.commons.annotations.DeprecatedRuleKey;
 @Rule(key = "PointerName")
 public class PointerNameCheck extends DelphiCheck {
   private static final String MESSAGE = "Rename this type to match the expected naming convention.";
+  private static final String POINTER_PREFIX = "P";
+  private static final String EXTENDED_TYPE_PREFIXES = "T,E,I";
+
+  private List<String> extendedTypePrefixesList;
+
+  @Override
+  public void start(DelphiCheckContext context) {
+    extendedTypePrefixesList = Splitter.on(',').trimResults().splitToList(EXTENDED_TYPE_PREFIXES);
+  }
 
   @Override
   public DelphiCheckContext visit(TypeDeclarationNode type, DelphiCheckContext context) {
@@ -41,20 +53,28 @@ public class PointerNameCheck extends DelphiCheck {
     return super.visit(type, context);
   }
 
-  private static boolean isViolation(TypeDeclarationNode type) {
+  private boolean isViolation(TypeDeclarationNode type) {
     if (type.isPointer()) {
       TypeNode typeNode = ((PointerTypeNode) type.getTypeNode()).getDereferencedTypeNode();
+
       if (typeNode instanceof TypeReferenceNode) {
         TypeReferenceNode referenceNode = (TypeReferenceNode) typeNode;
         String dereferencedName = referenceNode.simpleName();
-        String expected = expectedPointerName(dereferencedName);
-        return !type.simpleName().equals(expected);
+        String typeName = type.simpleName();
+
+        if (NameConventionUtils.compliesWithPrefix(dereferencedName, extendedTypePrefixesList)) {
+          String expected = POINTER_PREFIX + dereferencedName.substring(1);
+          return !typeName.equals(expected);
+        }
+
+        if (NameConventionUtils.compliesWithPascalCase(dereferencedName)) {
+          String expected = POINTER_PREFIX + dereferencedName;
+          return !typeName.equals(expected);
+        }
+
+        return !NameConventionUtils.compliesWithPrefix(typeName, POINTER_PREFIX);
       }
     }
     return false;
-  }
-
-  private static String expectedPointerName(String dereferencedName) {
-    return "P" + dereferencedName.substring(dereferencedName.startsWith("T") ? 1 : 0);
   }
 }
