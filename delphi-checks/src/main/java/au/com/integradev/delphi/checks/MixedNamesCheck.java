@@ -22,9 +22,13 @@
  */
 package au.com.integradev.delphi.checks;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableSortedSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.sonar.check.Rule;
+import org.sonar.check.RuleProperty;
 import org.sonar.plugins.communitydelphi.api.ast.ArgumentListNode;
 import org.sonar.plugins.communitydelphi.api.ast.AttributeNode;
 import org.sonar.plugins.communitydelphi.api.ast.DelphiNode;
@@ -48,6 +52,20 @@ public class MixedNamesCheck extends DelphiCheck {
   private static final String MESSAGE = "Avoid mixing names (found: \"%s\" expected: \"%s\").";
   private static final String QUICK_FIX_MESSAGE = "Correct to \"%s\"";
 
+  @RuleProperty(
+      key = "excludedNames",
+      description = "Comma-delimited list of names that this rule ignores (case-sensitive).")
+  public String excludedNames = "";
+
+  private Set<String> excludedSet;
+
+  @Override
+  public void start(DelphiCheckContext context) {
+    excludedSet =
+        ImmutableSortedSet.copyOf(
+            String.CASE_INSENSITIVE_ORDER, Splitter.on(',').trimResults().split(excludedNames));
+  }
+
   @Override
   public DelphiCheckContext visit(NameReferenceNode reference, DelphiCheckContext context) {
     NameDeclaration declaration = reference.getNameDeclaration();
@@ -65,7 +83,7 @@ public class MixedNamesCheck extends DelphiCheck {
       } else if (!isSpecialCase(declaration, occurrence)) {
         String actual = occurrence.getImage();
         String expected = declaration.getImage();
-        if (!actual.equals(expected)) {
+        if (!excludedSet.contains(actual) && !actual.equals(expected)) {
           DelphiNode location = reference.getIdentifier();
 
           context
@@ -115,7 +133,7 @@ public class MixedNamesCheck extends DelphiCheck {
           expected = StringUtils.removeEndIgnoreCase(expected, "Attribute");
         }
 
-        if (!actual.equals(expected)) {
+        if (!excludedSet.contains(actual) && !actual.equals(expected)) {
           DelphiNode location = lastNameReference.getIdentifier();
           context
               .newIssue()
