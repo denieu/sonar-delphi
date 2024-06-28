@@ -34,6 +34,9 @@ import org.sonarsource.analyzer.commons.annotations.DeprecatedRuleKey;
 @DeprecatedRuleKey(ruleKey = "LowerCaseReservedWordsRule", repositoryKey = "delph")
 @Rule(key = "LowercaseKeyword")
 public class LowercaseKeywordCheck extends DelphiCheck {
+  private static final String MESSAGE = "Lowercase this keyword (found: \"%s\" expected: \"%s\").";
+  private static final String QUICK_FIX_MESSAGE = "Correct to \"%s\"";
+
   @RuleProperty(
       key = "excludedKeywords",
       description = "Comma-delimited list of keywords that this rule ignores (case-insensitive).")
@@ -54,12 +57,15 @@ public class LowercaseKeywordCheck extends DelphiCheck {
       String actual = node.getToken().getImage();
       String expected = actual.toLowerCase();
 
+      FilePosition issuePosition = FilePosition.from(node.getToken());
+
       context
           .newIssue()
-          .onFilePosition(FilePosition.from(node.getToken()))
-          .withMessage(
-              String.format(
-                  "Lowercase this keyword (found: \"%s\" expected: \"%s\").", actual, expected))
+          .onFilePosition(issuePosition)
+          .withMessage(MESSAGE, expected)
+            .withQuickFixes(
+                QuickFix.newFix(QUICK_FIX_MESSAGE, expected)
+                    .withEdit(QuickFixEdit.replace(issuePosition, expected)))
           .report();
     }
     return super.visit(node, context);
